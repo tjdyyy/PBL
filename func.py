@@ -14,9 +14,10 @@ import librosa
 import soundfile as sf
 from moviepy.editor import *
 import shutil
+from soynlp.normalizer import *
 
 DATA_IN_PATH = './data_in/'
-DATA_OUT_PATH = './data-out/'
+DATA_OUT_PATH = './data_out/'
 
 okt = Okt()
 
@@ -122,7 +123,7 @@ class ClovaSpeechClient:
 
 # clova stt 이용한 결과 json 파일로 저장
 def clova(filename):
-    jsonname = './clovatest' # 추후 네이밍 룰 정하기
+    jsonname = 'clovatest' # 추후 네이밍 룰 정하기
 
     # res = ClovaSpeechClient().req_url(url='http://example.com/media.mp3', completion='sync')
     # res = ClovaSpeechClient().req_object_storage(data_key='data/media.mp3', completion='sync')
@@ -131,7 +132,7 @@ def clova(filename):
     json_data = res.text
     json_decode_data = json_data
 
-    with open(jsonname + '.json', 'w', encoding='UTF-8') as f:
+    with open(DATA_IN_PATH + jsonname + '.json', 'w', encoding='UTF-8') as f:
         f.write(json_decode_data)
 
     return jsonname+'.json'
@@ -139,7 +140,7 @@ def clova(filename):
 
 # json 파일에서 필요한 부분만 추출하여 csv 파일로 저장
 def json_to_csv(jsonfile):
-    with open(jsonfile, "r", encoding="utf8") as f:
+    with open(DATA_IN_PATH + jsonfile, "r", encoding="utf8") as f:
         contents = f.read()  # string 타입
         json_d = json.loads(contents)
 
@@ -157,8 +158,8 @@ def json_to_csv(jsonfile):
                        'end': end})
     df.head()
 
-    csvname = './stt_df' # 추후 네이밍 룰 정하기
-    df.to_csv(csvname+'.csv', index = False)
+    csvname = 'stt_df' # 추후 네이밍 룰 정하기
+    df.to_csv(DATA_IN_PATH + csvname+'.csv', index = False)
     return csvname+'.csv'
 
 
@@ -192,7 +193,7 @@ def preprocessing(sentence, okt, remove_stopwords=False, stop_words=[]):
 
 # stt 결과 전처리
 def clean_data(csvfile):
-    test_data = pd.read_csv(csvfile)
+    test_data = pd.read_csv(DATA_IN_PATH + csvfile)
     clean_test_sentence = []
 
     # 전처리 1
@@ -209,7 +210,7 @@ def clean_data(csvfile):
     clean_test_onlysentence_df = pd.DataFrame({'clean_word': clean_test_sentence})
 
     # 토큰화
-    clean_train_data = pd.read_csv(DATA_IN_PATH + 'clean_train_38.csv')
+    clean_train_data = pd.read_csv(DATA_IN_PATH + 'clean_train_26.csv')
     array_text = []
     for arr in clean_train_data['text']:
         array_text.append(eval(arr))
@@ -218,7 +219,7 @@ def clean_data(csvfile):
     tokenizer.fit_on_texts(array_text) # train에 사용된 text
     test_sequences = tokenizer.texts_to_sequences(clean_test_sentence)
 
-    MAX_SEQUENCE_LENGTH = 38 # 문장 평균값
+    MAX_SEQUENCE_LENGTH = 26 #38 # 문장 평균값
 
     test_inputs = pad_sequences(test_sequences, maxlen=MAX_SEQUENCE_LENGTH, padding='post')  # test data 벡터화
 
@@ -249,8 +250,8 @@ def load_model(npyfile, sttcsv):
     predict = newmodel.predict(stt_test_input)
     return_data = pd.read_csv(DATA_IN_PATH + sttcsv)
     return_data['predict'] = predict # 데이터 프레임에 predict 열 추가
-    return_data.to_csv(DATA_IN_PATH + 'result' + sttcsv, index=False)
-    return 'result' + sttcsv
+    return_data.to_csv(DATA_IN_PATH + 'result_' + sttcsv, index=False)
+    return 'result_' + sttcsv
 
 
 class bcolors:
@@ -286,12 +287,12 @@ def make_quiet_wav(wav, result, start, end, output_name):
     sf.write(output_name, data, 44100)
 
 # 비디오 복제
-def copy_video(video, idd):
-    data_output = DATA_IN_PATH + str(idd) + "/"
+def copy_video(video, data_output ):
+    #data_output = DATA_IN_PATH + str(idd) + "/"
     print(bcolors.OKGREEN + '\nplease wait! \n' + bcolors.ENDC)
 
     # 파일 복사하기 (사본 생성)
-    shutil.copy2(DATA_IN_PATH+video, data_output+"copied_"+video)
+    shutil.copy2(DATA_IN_PATH + video, data_output + "copied_" + video)
     print(bcolors.OKGREEN + '\nMake copy of video ! \n' + bcolors.ENDC)
 
 # 비디오에서 음성 추출
@@ -329,14 +330,14 @@ def video_processing(video, resultfile):
         print('Error: Creating directory. ' + data_output)
         quit()
 
-    copy_video(video, idd) # 영상 복제
+    copy_video(video, data_output) # 영상 복제
     wav_from_video(video, data_output) # 음성 추출
     # 무음 처리
     make_quiet_wav(data_output + "copy.wav", result, start, end, data_output + "{}_result_{}.wav".format(idd, video))
 
     videoclip = VideoFileClip(DATA_IN_PATH + video)
     videoclip = videoclip.set_audio(AudioFileClip(data_output + "{}_result_{}.wav".format(idd, video)))
-    videoclip.write_videofile(data_output + "{}_result_{}".format(idd, video))
+    videoclip.write_videofile(data_output + "{}_result_{}".format(idd, video)) #videoclip.fps
 
     print(bcolors.OKGREEN + '\nNow you can check!!! ' + bcolors.ENDC)
 
